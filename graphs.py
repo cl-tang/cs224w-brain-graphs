@@ -18,6 +18,8 @@ def graph_to_data(graph_path: Path, age: float, edge_key="number_of_fibers") -> 
             float(a["dn_position_y"]),
             float(a["dn_position_z"]),
         ]
+    # replace NaNs with 0.0 (some graphs have NaNs) (can be updated to other methods)
+    coords = np.nan_to_num(coords, nan=0.0, posinf=0.0, neginf=0.0)
     x = torch.tensor(coords, dtype=torch.float32)
 
     # edges: undirected + raw edge weights
@@ -30,7 +32,11 @@ def graph_to_data(graph_path: Path, age: float, edge_key="number_of_fibers") -> 
         ew  += [w,  w]
 
     edge_index  = torch.tensor([src, dst], dtype=torch.long)
-    edge_weight = torch.tensor(ew, dtype=torch.float32)
+    # replace NaN edge weights with 0.0 (can be updated to other methods)
+    edge_weight = torch.tensor(
+        np.nan_to_num(np.array(ew, dtype=np.float32), nan=0.0, posinf=0.0, neginf=0.0),
+        dtype=torch.float32,
+    )
 
     # label: age
     y = torch.tensor([float(age)], dtype=torch.float32)
