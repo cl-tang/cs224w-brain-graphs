@@ -11,7 +11,7 @@ from torch_geometric.loader import DataLoader
 from torch.utils.data import Subset
 
 from data import BrainGraphDataset
-from models import GCNRegressor, GraphSAGERegressor
+from models import GCNRegressor, GraphSAGERegressor, EdgeSAGERegressor, GraphTransformerRegressor
 from utils import device
 from paths import PHENOTYPES_CSV, GRAPH_DIR
 from plot import plot_training_curves
@@ -19,8 +19,8 @@ from plot import plot_training_curves
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--graph_resolution", type=str, default="86_nodes", help="Number of nodes in the graph")
-    parser.add_argument("--model", choices=["gcn", "sage"], default="gcn")
+    parser.add_argument("--graph_resolution", type=str, default="86", help="Number of nodes in the graph")
+    parser.add_argument("--model", choices=["gcn", "sage", "edgesage", "transformer"], default="gcn")
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--hidden-dim", type=int, default=32)
     parser.add_argument("--num-layers", type=int, default=2)
@@ -89,13 +89,40 @@ def main():
 
     in_dim = dataset.num_node_features
     print(f"Model: {args.model.upper()}Regressor, Hidden Dim: {args.hidden_dim}, Num Layers: {args.num_layers}, Dropout: {args.dropout}")
-    model_cls = GCNRegressor if args.model == "gcn" else GraphSAGERegressor
-    model = model_cls(
-        in_channels=in_dim,
-        hidden_channels=args.hidden_dim,
-        num_layers=args.num_layers,
-        dropout=args.dropout,
-    ).to(dev)
+    if args.model == "gcn":
+        model = GCNRegressor(
+            in_channels=in_dim,
+            hidden_channels=args.hidden_dim,
+            num_layers=args.num_layers,
+            dropout=args.dropout,
+        )
+    elif args.model == "sage":
+        model = GraphSAGERegressor(
+            in_channels=in_dim,
+            hidden_channels=args.hidden_dim,
+            num_layers=args.num_layers,
+            dropout=args.dropout,
+        )
+    elif args.model == "edgesage":
+        edge_in_dim = dataset[0].edge_attr.size(-1)
+        model = EdgeSAGERegressor(
+            in_channels=in_dim,
+            edge_in_channels=edge_in_dim,
+            hidden_channels=args.hidden_dim,
+            num_layers=args.num_layers,
+            dropout=args.dropout,
+        )
+    elif args.model == "transformer":
+        edge_in_dim = dataset[0].edge_attr.size(-1)
+        model = GraphTransformerRegressor(
+            in_channels=in_dim,
+            edge_in_channels=edge_in_dim,
+            hidden_channels=args.hidden_dim,
+            num_layers=args.num_layers,
+            dropout=args.dropout,
+            heads=4,
+        )
+    model = model.to(dev)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 
     train_losses = []

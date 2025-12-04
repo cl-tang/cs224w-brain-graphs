@@ -24,22 +24,52 @@ def graph_to_data(graph_path: Path, age: float, edge_key="number_of_fibers") -> 
 
     # edges: undirected + raw edge weights
     src, dst, ew = [], [], []
+    edge_attrs_list = []
+
+    edge_feature_keys = None
+
     for u, v, d in G.edges(data=True):
         ui, vi = idx[u], idx[v]
-        w = float(d[edge_key])
-        src += [ui, vi]
-        dst += [vi, ui]
-        ew  += [w,  w]
 
-    edge_index  = torch.tensor([src, dst], dtype=torch.long)
-    # replace NaN edge weights with 0.0 (can be updated to other methods)
+        if edge_feature_keys is None:
+            numeric_keys = []
+            for k, val in d.items():
+                try:
+                    float(val)
+                    numeric_keys.append(k)
+                except (TypeError, ValueError):
+                    continue
+            edge_feature_keys = numeric_keys
+
+        if edge_key in d:
+            w = float(d[edge_key])
+        else:
+            w = 0.0
+
+        src.extend([ui, vi])
+        dst.extend([vi, ui])
+        ew.extend([w, w])
+
+        if edge_feature_keys:
+            feat_vec = [float(d.get(k, np.nan)) for k in edge_feature_keys]
+            edge_attrs_list.append(feat_vec)
+            edge_attrs_list.append(feat_vec)
+
+    edge_index = torch.tensor([src, dst], dtype=torch.long)
+
     edge_weight = torch.tensor(
         np.nan_to_num(np.array(ew, dtype=np.float32), nan=0.0, posinf=0.0, neginf=0.0),
         dtype=torch.float32,
     )
+    if edge_attrs_list:
+        edge_attr_arr = np.array(edge_attrs_list, dtype=np.float32)
+        edge_attr_arr = np.nan_to_num(edge_attr_arr, nan=0.0, posinf=0.0, neginf=0.0)
+        edge_attr = torch.tensor(edge_attr_arr, dtype=torch.float32)
+    else:
+        edge_attr = None
 
     # label: age
     y = torch.tensor([float(age)], dtype=torch.float32)
 
-    data = Data(x=x, edge_index=edge_index, y=y, edge_weight=edge_weight)
+    data = Data(x=x, edge_index=edge_index, y=y, edge_weight=edge_weight, edge_attr=edge_attr)
     return data
