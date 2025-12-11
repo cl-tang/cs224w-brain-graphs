@@ -10,6 +10,7 @@ from torch_geometric.loader import DataLoader
 
 from torch.utils.data import Subset
 
+from alters import AlterSRegressor
 from data import BrainGraphDataset
 from models import GCNRegressor, GraphSAGERegressor, EdgeSAGERegressor, GraphTransformerRegressor
 from utils import device
@@ -20,7 +21,7 @@ from plot import plot_training_curves
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--graph_resolution", type=str, default="86", help="Number of nodes in the graph")
-    parser.add_argument("--model", choices=["gcn", "sage", "edgesage", "transformer"], default="gcn")
+    parser.add_argument("--model", choices=["gcn", "sage", "edgesage", "transformer", "alter-s"], default="gcn")
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--hidden-dim", type=int, default=32)
     parser.add_argument("--num-layers", type=int, default=2)
@@ -75,6 +76,12 @@ def main():
         cache_dir=args.cache_dir,
     )
 
+    edge_attr = getattr(dataset[0], "edge_attr", None)
+    if edge_attr is not None:
+        edge_in_dim = edge_attr.size(-1)
+    else:
+        edge_in_dim = 0
+
     idx = np.arange(len(dataset))
     tr, te = train_test_split(idx, test_size=0.2, random_state=0)
     tr, va = train_test_split(tr, test_size=0.2, random_state=0)
@@ -122,6 +129,18 @@ def main():
             dropout=args.dropout,
             heads=4,
         )
+    elif args.model == "alter-s":
+        model = AlterSRegressor(
+            in_channels=in_dim,
+            edge_in_channels=edge_in_dim,
+            hidden_channels=args.hidden_dim,
+            num_layers=args.num_layers,
+            dropout=args.dropout,
+            heads=4,
+            long_range_steps=4,
+            long_range_dim=32,
+        )
+
     model = model.to(dev)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 
