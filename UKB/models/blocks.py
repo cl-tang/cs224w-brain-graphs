@@ -4,6 +4,7 @@ GNN building blocks.
 Block structure: Conv -> Norm -> Activation -> Dropout -> (+Residual)
 """
 
+from .gine_edge_mlp import GINEWithEdgeMLP # this line might not work
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -85,6 +86,18 @@ def create_conv_layer(conv_type, in_channels, out_channels, edge_dim=0, num_head
             in_channels, head_dim, heads=num_heads, concat=True,
             edge_dim=edge_dim if edge_dim > 0 else None,
         )
+    
+    if conv_type == "gine_edge_mlp":
+        edge_in_dim = edge_dim
+        edge_hidden_dim = out_channels // 2, 16
+
+        return GINEWithEdgeMLP(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            edge_in_dim=edge_in_dim,
+            edge_hidden_dim=edge_hidden_dim,
+        )
+
 
     raise ValueError(f"Unknown conv_type: {conv_type}")
 
